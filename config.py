@@ -41,7 +41,7 @@ ENGINE1_SOURCES: list[Source] = [
     Source(
         key="cms_pub_100_04_ch39",
         name="CMS IOM Pub 100-04, Medicare Claims Processing Manual, Ch 39 (OTP)",
-        url="https://www.cms.gov/regulations-and-guidance/guidance/manuals/downloads/clm104c39.pdf",
+        url="https://www.cms.gov/files/document/chapter-39-opioid-treatment-programs-otps.pdf",
         cadence="monthly",
         engine="engine1",
         fetch_mode="pdf",
@@ -50,7 +50,7 @@ ENGINE1_SOURCES: list[Source] = [
     Source(
         key="cms_pub_100_02_ch17",
         name="CMS IOM Pub 100-02, Medicare Benefit Policy Manual, Ch 17 (OTP)",
-        url="https://www.cms.gov/regulations-and-guidance/guidance/manuals/downloads/bp102c17.pdf",
+        url="https://www.cms.gov/files/document/chapter-17-opioid-treatment-programs-otps.pdf",
         cadence="monthly",
         engine="engine1",
         fetch_mode="pdf",
@@ -59,7 +59,7 @@ ENGINE1_SOURCES: list[Source] = [
     Source(
         key="cms_mln_otp_booklet",
         name="CMS MLN Booklet — OTP Medicare Billing & Payment (MLN8296732)",
-        url="https://www.cms.gov/files/document/mln8296732-opioid-treatment-programs-otps-medicare-billing-payment-other-key-requirements.pdf",
+        url="https://www.cms.gov/sites/default/files/2021-12/2021_12_MLN8296732_OTP_Billing_Payment_FINAL_0.pdf",
         cadence="bi-annually",
         engine="engine1",
         fetch_mode="pdf",
@@ -67,7 +67,7 @@ ENGINE1_SOURCES: list[Source] = [
     Source(
         key="fl_ahca_cbh_handbook",
         name="Florida AHCA — Community Behavioral Health Services Handbook",
-        url="https://ahca.myflorida.com/medicaid/policy-and-quality/policy/behavioral-health-coverage",
+        url="https://ahca.myflorida.com/medicaid/medicaid-policy-quality-and-operations/medicaid-policy-and-quality/medicaid-policy/medical-and-behavioral-health-coverage-policy/behavioral-health-and-health-facilities/community-behavioral-health-services",
         cadence="quarterly",
         engine="engine1",
         fetch_mode="selenium",
@@ -76,11 +76,13 @@ ENGINE1_SOURCES: list[Source] = [
     ),
     Source(
         key="fl_mac_fcso_otp",
-        name="FCSO (Medicare FL MAC) — OTP Fact Sheet",
-        url="https://medicare.fcso.com/Publications_B/0476795.pdf",
+        name="FCSO (Medicare FL MAC) — OTP Specialty Page",
+        # FCSO hosts an HTML landing page (not a single PDF). The scraper
+        # harvests G-code mentions + outbound CMS PDF references from the HTML.
+        url="https://medicare.fcso.com/specialties/otp",
         cadence="bi-annually",
         engine="engine1",
-        fetch_mode="pdf",
+        fetch_mode="html",
     ),
     Source(
         key="cms_ncci_edits",
@@ -155,10 +157,12 @@ def by_key(key: str) -> Source:
 
 
 # ---------- Pipeline knobs ----------
+# Plain Chrome UA. The earlier "VAIntagePathwaysBot/0.1" prefix tripped
+# Cloudflare-style bot detection on store.samhsa.gov (403). Once we have a
+# stable IP allowlist with each agency, swap back to a signed bot UA.
 USER_AGENT = (
-    "VAIntagePathwaysBot/0.1 (+contact: dev@vaintage.health) "
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 REQUEST_TIMEOUT_SECS = 30
 MAX_RETRIES = 3

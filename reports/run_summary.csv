@@ -1,0 +1,9 @@
+source_key,source_name,status,fetched_at,raw_bytes,content_sha256,extracted_count,extracted_unit,doc_label,warnings
+cms_mln_otp_booklet,CMS MLN Booklet — OTP Medicare Billing & Payment (MLN8296732),OK,2026-05-21T07:32:37.070365+00:00,3378819,b03e94ae7ca777c26f09ed98fe59733842fcdbf47e6c0797294e18ae060835e2,13,G-codes mentioned,MLN OTP Booklet,
+cms_ncci_edits,CMS NCCI PTP Edits — Practitioner,OK,2026-05-21T07:32:38.691904+00:00,170165,a0ce4bf2966ce02d5efe1b709bcf312ef7e230321c52faff08be7015acd39c16,0,NCCI edits,NCCI PTP Edits (practitioner),
+cms_pub_100_02_ch17,"CMS IOM Pub 100-02, Medicare Benefit Policy Manual, Ch 17 (OTP)",OK,2026-05-21T07:32:35.166481+00:00,355826,2c365f78a35cba22386b31fe9446d3db17485b6fcc552af3db4a4d5e3907d7d1,10,G-codes mentioned,Pub 100-02 Ch 17,
+cms_pub_100_04_ch39,"CMS IOM Pub 100-04, Medicare Claims Processing Manual, Ch 39 (OTP)",OK,2026-05-21T07:32:34.043835+00:00,375532,8c0f7934527e11ebb7b9b0773da4f94d11b67c2468c2d698317131d496a8b768,12,G-codes mentioned,Pub 100-04 Ch 39,
+ecfr_42_part_8,42 CFR Part 8 — Medications for Treatment of Opioid Use Disorder,OK,2026-05-21T07:32:39.575527+00:00,104517,0b136a303c8707ed437abeabe45b9dba351f77cef136e70d992dac841a6dceaa,25,sections,42 CFR Part 8,
+fl_ahca_cbh_handbook,Florida AHCA — Community Behavioral Health Services Handbook,OK,2026-05-21T07:32:37.629797+00:00,55838,8a7da28c11f236c3e73a1a4c5ac4eab6820df48c337beee7f4004129a24a0174,0,PDF links,FL AHCA Community Behavioral Health,
+fl_mac_fcso_otp,FCSO (Medicare FL MAC) — OTP Specialty Page,OK,2026-05-21T07:32:38.272696+00:00,172249,aa29afe58719fdf85b14b6ce261c015ecaf501b93ed24ae292d2d8ec4e65e546,0,G-codes mentioned,FCSO OTP Specialty Page (HTML),
+samhsa_tip_63,SAMHSA Treatment Improvement Protocol (TIP) 63 — MAT,OK,2026-05-21T07:32:56.035251+00:00,3427264,e7f4c2e40a5d5bb11f30889c16a7cd96816c81c175b9304344d9c28b8cb48c36,0,,SAMHSA TIP 63,

@@ -1,0 +1,6 @@
+rule_id,payer_type,code,required_modifier,logic_type,source_key,params_json
+R-FED-01,Medicare Advantage,G2067,,BundleValidation,cms_pub_100_04_ch39,"{""min_services_in_bundle"": 1, ""window_days"": 7, ""g_codes_in_scope"": [""G2067"", ""G2068"", ""G2069"", ""G2070"", ""G2072"", ""G2073"", ""G2074"", ""G2075"", ""G2076"", ""G2077"", ""G2078"", ""G2079""]}"
+R-FL-02,Managed Medicaid,H0020,POS-58,PointOfCareBlock,fl_ahca_cbh_handbook,{}
+R-FL-03,AHCA Medicaid,ALL_SUD,HF,SubstanceAbuseModifier,fl_ahca_cbh_handbook,{}
+R-FL-04,AHCA Medicaid,H0020,HD>HG,ModifierSequencer,fl_ahca_cbh_handbook,"{""trigger_icd_prefix"": ""O"", ""alt_modifier"": ""HG""}"
+R-FLMAC-01,Medicare,G2067,,PayerBlocker,fl_mac_fcso_otp,"{""enforce_g_codes"": [], ""block_standard_hcpcs"": true}"
