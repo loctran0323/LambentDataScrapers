@@ -108,6 +108,23 @@ ENGINE1_SOURCES: list[Source] = [
         engine="engine1",
         fetch_mode="pdf",
     ),
+    Source(
+        key="fl_ahca_carf_ai_consent",
+        name="FL AHCA / CARF — AI Patient Consent & Transparency (Rule 32)",
+        # AHCA rule-promulgation index + CARF technology standards. The exact
+        # rule text for the "advance consent to use AI" mandate is still
+        # evolving, so this URL is the monitoring entry point, NOT a stable deep
+        # link — validate before wiring a parser (see README caveat on source
+        # URLs). Tracked as Developer Master Matrix Rule 32: block admission
+        # until a time-stamped AI-consent form is on file.
+        url="https://ahca.myflorida.com/health-care-policy-and-oversight/bureau-of-central-services/rule-promulgation",
+        cadence="quarterly",
+        engine="engine1",
+        fetch_mode="selenium",
+        notes="Speculative/evolving AI-consent mandate (not yet a confirmed "
+        "statute). No scraper registered yet — config entry is the diff-tracked "
+        "source-of-record per the README review.",
+    ),
 ]
 
 # ---------- Engine 2: Clinical / SDOH NLP corpus sources ----------
@@ -146,6 +163,21 @@ ENGINE2_SOURCES: list[Source] = [
         cadence="ad-hoc",
         engine="engine2",
         notes="Subscription-gated. Phase 1 task: confirm institutional access; phase 2 wires it in.",
+    ),
+    Source(
+        key="cfr_42_part_2",
+        name="42 CFR Part 2 (Subpart C) — Confidentiality of SUD Records / Consent",
+        # eCFR API root, same fetch path as ecfr_42_part_8: resolve latest issue
+        # date, pull Part 2 XML. Engine 2 needs Subpart C §2.31 — the 9 mandatory
+        # elements of a valid consent — so a referral can't be authorized without
+        # an active, conforming Release of Information on file.
+        url="https://www.ecfr.gov",
+        cadence="annually",
+        engine="engine2",
+        fetch_mode="json-api",
+        notes="Confidentiality of SUD records. Scrape §2.31 for the 9 required "
+        "consent elements. No scraper registered yet — extend ECFRPart8Scraper "
+        "to Part 2 as the follow-up.",
     ),
 ]
 

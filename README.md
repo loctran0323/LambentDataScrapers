@@ -49,6 +49,14 @@ the VAIntage Desktop Agent.
    data/processed/engine1_matrix.{candidate,live}.json  (→ Desktop Agent)
 ```
 
+> **Cloud retention note (Zero-PHI).** This repo only produces *public policy
+> data* — federal/state rules and de-identified guideline text — so nothing it
+> emits is PHI. Downstream, the Engine 2 RAG chunks feed an **Azure Cosmos DB
+> vector database that enforces a strict 30-day TTL (Time-To-Live)** on
+> admission-risk records. The TTL is the cloud-side guarantee behind our
+> Zero-PHI retention policy: any patient-derived context Engine 2 caches for
+> longitudinal analysis auto-expires within 30 days of capture.
+
 ## Quick start
 
 ```bash
@@ -148,7 +156,23 @@ Federal rules execute **before** Florida-specific overrides, per the addendum.
 | `sunshine_provider_manual` | PDF | monthly | 1 | ✅ live |
 | `simply_provider_resources` | PDF | quarterly | 1 | ✅ live |
 | `cdc_icd10_z_codes` | PDF | annually | 2 | ✅ live |
+| `cfr_42_part_2` | JSON/XML API | annually | 2 | 🛠 configured, scraper TBD |
+| `fl_ahca_carf_ai_consent` | HTML (Selenium) | quarterly | 1 | 🛠 configured, scraper TBD |
 | `asam_criteria` | gated | ad-hoc | 2 | 🔒 subscription required |
+
+The two newest targets come from the README review against the Developer Master
+Matrix:
+- **`cfr_42_part_2`** — 42 CFR Part 2, Subpart C (§2.31). Engine 2 needs the
+  **9 mandatory elements of a valid consent** so a referral can't be authorized
+  without a conforming, active Release of Information on file.
+- **`fl_ahca_carf_ai_consent`** — FL AHCA / CARF **Rule 32**: advance patient
+  consent for AI utilization. Engine 1 blocks admission until a time-stamped
+  AI-consent form is signed. This mandate is still evolving — the configured URL
+  is a monitoring entry point, not a stable deep link, and needs validation
+  before a parser is wired (consistent with our general source-URL caveat).
+
+Both are wired into `config.py` as the diff-tracked source-of-record; no scraper
+is registered yet (they're skipped gracefully at runtime, like `asam_criteria`).
 
 ## Azure Functions deployment (Phase 5)
 
@@ -161,7 +185,45 @@ az login
 func azure functionapp publish <your-function-app-name> --python
 ```
 
-Configure two environment variables on the Function App:
+### Secrets: Azure Key Vault + Managed Identity (Zero-Trust)
+
+Per our Zero-Trust architecture, **do not store secrets in plaintext Function
+App Settings** — especially the gated/subscription credentials we'll need for
+sources like the ASAM Criteria. Instead:
+
+1. **Enable a system-assigned Managed Identity** on the Function App:
+   ```bash
+   az functionapp identity assign --name <app> --resource-group <rg>
+   ```
+2. **Grant that identity read access to a Key Vault** (RBAC role
+   `Key Vault Secrets User`, scoped to the vault):
+   ```bash
+   az role assignment create \
+     --assignee <function-app-principal-id> \
+     --role "Key Vault Secrets User" \
+     --scope /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.KeyVault/vaults/<vault>
+   ```
+3. **Store each secret in Key Vault** (e.g. `az keyvault secret set --vault-name
+   <vault> --name asam-credential --value <…>`).
+4. **Retrieve at runtime via the Managed Identity** — no secret material on disk
+   or in App Settings. Either reference the secret from App Settings with a Key
+   Vault reference (`@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<name>/)`),
+   or read it in-process with `DefaultAzureCredential`:
+   ```python
+   from azure.identity import DefaultAzureCredential
+   from azure.keyvault.secrets import SecretClient
+
+   client = SecretClient(
+       vault_url="https://<vault>.vault.azure.net",
+       credential=DefaultAzureCredential(),  # uses the Managed Identity in Azure
+   )
+   asam_credential = client.get_secret("asam-credential").value
+   ```
+   (`pip install azure-identity azure-keyvault-secrets`.)
+
+### Non-secret configuration
+
+These are plain (non-sensitive) settings and may stay in App Settings:
 - `BRAIN_SOURCES` (optional, comma-separated source keys to run; default = all)
 - `BRAIN_PROMOTE` (`true` to auto-promote candidate → live when diff is material)
 
@@ -171,11 +233,16 @@ For separate federal-vs-Florida cadences, deploy two Functions with different
 
 ## Known limitations / iterations
 
-- **NCCI delta-only**: the CMS landing page links to the quarterly
-  *additions/deletions* zip, not the full PTP table. If CMS makes no OTP edit
-  changes in a given quarter, we get 0 rows for OTP — that's accurate, not a
-  bug. To get the full PTP universe, switch to the full quarterly tables
-  (4 xlsx files, ~2.5M rows total) — needs a streaming xlsx parser.
+- **NCCI full-table ingestion**: the scraper now parses **both** the delta
+  `.txt` additions/deletions **and** any `.xlsx` workbooks in the downloaded zip,
+  using a streaming reader (`openpyxl` `read_only=True` + `iter_rows()`) so memory
+  stays flat even on the ~2.5M-row full quarterly PTP tables. Rows are
+  de-duplicated across `.txt`/`.xlsx`. *Remaining step:* the CMS landing page
+  link this scraper follows still resolves to the quarterly delta zip — point
+  `cms_ncci_edits` at the full PTP table zip (or add discovery of that link) so
+  Engine 1 picks up historical unbundling edits (e.g. the H0020 + 80305
+  conflict), not just the current quarter's changes. The parser itself is ready
+  for the full universe today.
 - **AHCA modifier extraction**: the MAT-specific AHCA PDFs (Methadone Criteria,
   PT 2021-25) cover clinical criteria and drug coverage but don't enumerate
   modifier rules. The R-FL-* rules are hardcoded from the addendum spec; the
