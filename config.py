@@ -86,11 +86,25 @@ ENGINE1_SOURCES: list[Source] = [
     ),
     Source(
         key="cms_ncci_edits",
-        name="CMS NCCI PTP Edits — Practitioner",
+        name="CMS NCCI PTP Edits — Practitioner (full table)",
         url="https://www.cms.gov/medicare/coding-billing/national-correct-coding-initiative-ncci-edits/medicare-ncci-procedure-procedure-ptp-edits",
         cadence="quarterly",
         engine="engine1",
-        notes="Landing page links out to quarterly ZIPs containing PTP edit CSVs.",
+        notes="Scraper now pulls the FULL practitioner PTP table (4 license-gated "
+        "zips, ~2.6M rows), streamed via openpyxl, not just the quarterly delta. "
+        "NOTE: the Medicare practitioner file has no edits for OTP bundle G-codes "
+        "and contains no H-codes — H0020 unbundling lives in cms_ncci_medicaid.",
+    ),
+    Source(
+        key="cms_ncci_medicaid",
+        name="CMS NCCI Medicaid PTP Edits (H-codes / H0020)",
+        url="https://www.cms.gov/medicare/coding-billing/ncci-medicaid/medicaid-ncci-edit-files",
+        cadence="quarterly",
+        engine="engine1",
+        notes="Where the H0020 + 80305 type unbundling edits actually live "
+        "(H-codes are Medicaid, absent from the Medicare PTP file). Same zip/xlsx "
+        "shape as Medicare PTP — generalize NCCIScraper to this URL as the "
+        "follow-up. No scraper registered yet.",
     ),
     Source(
         key="sunshine_provider_manual",

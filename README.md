@@ -148,7 +148,8 @@ Federal rules execute **before** Florida-specific overrides, per the addendum.
 | `cms_pub_100_04_ch39` | PDF | monthly | 1 | ✅ live |
 | `cms_pub_100_02_ch17` | PDF | monthly | 1 | ✅ live |
 | `cms_mln_otp_booklet` | PDF | bi-annually | 1 | ✅ live |
-| `cms_ncci_edits` | ZIP | quarterly | 1 | ✅ live (0 OTP edits this Q) |
+| `cms_ncci_edits` | ZIP (full table) | quarterly | 1 | ✅ live (full PTP table; 0 OTP-code edits — see limitations) |
+| `cms_ncci_medicaid` | ZIP | quarterly | 1 | 🛠 configured, scraper TBD (H0020 edits) |
 | `fl_ahca_cbh_handbook` | HTML | quarterly | 1 | ✅ live |
 | `fl_mac_fcso_otp` | HTML | bi-annually | 1 | ✅ live |
 | `ecfr_42_part_8` | JSON/XML API | ad-hoc | 2 | ✅ live |
@@ -233,16 +234,22 @@ For separate federal-vs-Florida cadences, deploy two Functions with different
 
 ## Known limitations / iterations
 
-- **NCCI full-table ingestion**: the scraper now parses **both** the delta
-  `.txt` additions/deletions **and** any `.xlsx` workbooks in the downloaded zip,
-  using a streaming reader (`openpyxl` `read_only=True` + `iter_rows()`) so memory
-  stays flat even on the ~2.5M-row full quarterly PTP tables. Rows are
-  de-duplicated across `.txt`/`.xlsx`. *Remaining step:* the CMS landing page
-  link this scraper follows still resolves to the quarterly delta zip — point
-  `cms_ncci_edits` at the full PTP table zip (or add discovery of that link) so
-  Engine 1 picks up historical unbundling edits (e.g. the H0020 + 80305
-  conflict), not just the current quarter's changes. The parser itself is ready
-  for the full universe today.
+- **NCCI now pulls the full PTP table.** The scraper discovers the full
+  practitioner PTP table on the CMS page (4 license-gated zips, ~2.6M rows
+  total), unwraps the AMA-license click-through to the direct `/files/zip/` URL,
+  downloads every part of the newest quarter+version, and stream-parses each via
+  `openpyxl` `read_only=True` + `iter_rows()` (flat memory). It also handles the
+  two different column layouts — modifier indicator at column 2 in the delta
+  files vs. column 5 in the full table. De-dupes across parts and `.txt`/`.xlsx`.
+  Falls back to the quarterly delta zip if the full table can't be located.
+  Verified end-to-end against the live Q2-2026 files.
+- **OTP edits & the Medicaid gap (important).** Even with the full table, the
+  *Medicare* practitioner PTP file has **no edits for the OTP bundle G-codes**
+  (G2067–G2080) and **no H-codes at all** — H-codes are Medicaid. So the
+  "H0020 + 80305" unbundling conflict is **not** in this file; it lives in the
+  separate **Medicaid NCCI edit file** (`cms_ncci_medicaid`, now in `config.py`).
+  Next step to actually surface H0020 edits: generalize `NCCIScraper` to that
+  Medicaid URL (same zip/xlsx shape).
 - **AHCA modifier extraction**: the MAT-specific AHCA PDFs (Methadone Criteria,
   PT 2021-25) cover clinical criteria and drug coverage but don't enumerate
   modifier rules. The R-FL-* rules are hardcoded from the addendum spec; the

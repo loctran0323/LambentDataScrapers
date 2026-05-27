@@ -26,10 +26,11 @@ the .txt additions/deletions so we don't double-count.
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 import zipfile
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import openpyxl
 from bs4 import BeautifulSoup
@@ -52,19 +53,41 @@ RELEVANT_CODES = {
     "H0050", "H2010", "H2017",
 }
 
-RE_PRACTITIONER_ZIP = re.compile(r"practitioner.*\.zip$", re.I)
+# Full practitioner PTP table parts. CMS splits the ~2.6M-row practitioner
+# universe into f1..fN zips because each exceeds Excel's 1,048,576-row cap, and
+# fronts each download with an AMA-license click-through:
+#   /license/ama?file=/files/zip/medicare-ncci-2026q2-practitioner-ptp-edits-ccipra-v321r0-f1.zip
+# "ccipra" = Correct Coding Initiative, PRActitioner ("ccioph" is the hospital
+# set, which we don't evaluate). We match the practitioner full-table parts and
+# pull every part of the most recent quarter+version.
+RE_FULL_PRACTITIONER = re.compile(
+    r"medicare-ncci-(?P<year>\d{4})q(?P<qtr>\d)-practitioner-ptp-edits-"
+    r"ccipra-v(?P<vmaj>\d+)r(?P<vmin>\d+)-f(?P<part>\d+)\.zip",
+    re.I,
+)
+# The quarterly delta (additions/deletions/revisions). Kept as a fallback when
+# the full table can't be located, so a run still produces *something*.
+RE_DELTA_PRACTITIONER = re.compile(
+    r"practitioner.*(?:additions|deletions|revisions|quarterly).*\.zip", re.I
+)
 
 
 class NCCIScraper(BaseScraper):
     def parse(self) -> ScrapeResult:
         html = self.fetch_text(self.source.url)
         soup = BeautifulSoup(html, "lxml")
-        zip_urls = [
-            urljoin(self.source.url, a["href"])
-            for a in soup.find_all("a", href=True)
-            if RE_PRACTITIONER_ZIP.search(a["href"])
-        ]
-        if not zip_urls:
+        hrefs = [a["href"] for a in soup.find_all("a", href=True)]
+
+        full_parts = _select_full_table_parts(hrefs, self.source.url)
+        if full_parts:
+            return self._scrape_full_table(full_parts)
+
+        # Fallback: the quarterly delta zip (current-quarter changes only).
+        delta = next(
+            (urljoin(self.source.url, h) for h in hrefs if RE_DELTA_PRACTITIONER.search(h)),
+            None,
+        )
+        if delta is None:
             return ScrapeResult(
                 source_key=self.source.key,
                 source_name=self.source.name,
@@ -72,13 +95,10 @@ class NCCIScraper(BaseScraper):
                 content_sha256="",
                 raw_path="",
                 parsed={"doc": "NCCI", "edits": []},
-                warnings=["No practitioner PTP zip link found on landing page"],
+                warnings=["No practitioner PTP zip link (full table or delta) found"],
             )
-
-        zip_url = zip_urls[0]
-        payload = self.fetch_bytes(zip_url)
+        payload = self.fetch_bytes(delta)
         raw_path, digest = self._persist_raw(payload, suffix=".zip")
-
         edits = self._extract_relevant_edits(payload)
         return ScrapeResult(
             source_key=self.source.key,
@@ -87,19 +107,66 @@ class NCCIScraper(BaseScraper):
             content_sha256=digest,
             raw_path=str(raw_path),
             parsed={
-                "doc": "NCCI PTP Edits (practitioner)",
-                "source_zip": zip_url,
+                "doc": "NCCI PTP Edits (practitioner, DELTA fallback)",
+                "table_scope": "delta",
+                "source_zips": [delta],
                 "edit_count_relevant": len(edits),
                 "edits": edits,
             },
+            warnings=["Full PTP table not found; fell back to quarterly delta zip"],
+        )
+
+    def _scrape_full_table(self, parts: list[str]) -> ScrapeResult:
+        """Download + stream-parse every part of the full practitioner table."""
+        edits: list[dict] = []
+        part_digests: list[str] = []
+        first_raw_path = ""
+        warnings: list[str] = []
+        seen: set[tuple[str, str, str]] = set()
+        for url in parts:
+            payload = self.fetch_bytes(url)
+            raw_path, digest = self._persist_raw(payload, suffix=".zip")
+            part_digests.append(digest)
+            first_raw_path = first_raw_path or str(raw_path)
+            # Guard against the license-page HTML coming back instead of a zip.
+            if not zipfile.is_zipfile(io.BytesIO(payload)):
+                warnings.append(f"Not a zip (license redirect?): {url}")
+                continue
+            self._extract_relevant_edits(payload, edits=edits, seen=seen)
+        # Stable combined digest so the diff-checker tracks the table as a unit.
+        combined = hashlib.sha256("".join(part_digests).encode()).hexdigest()
+        return ScrapeResult(
+            source_key=self.source.key,
+            source_name=self.source.name,
+            fetched_at="",
+            content_sha256=combined,
+            raw_path=first_raw_path,
+            parsed={
+                "doc": "NCCI PTP Edits (practitioner, FULL table)",
+                "table_scope": "full",
+                "source_zips": parts,
+                "part_count": len(parts),
+                "edit_count_relevant": len(edits),
+                "edits": edits,
+            },
+            warnings=warnings,
         )
 
     @classmethod
-    def _extract_relevant_edits(cls, payload: bytes) -> list[dict]:
-        edits: list[dict] = []
+    def _extract_relevant_edits(
+        cls,
+        payload: bytes,
+        edits: list[dict] | None = None,
+        seen: set[tuple[str, str, str]] | None = None,
+    ) -> list[dict]:
         # De-dup across files: the delta zip ships the same edits as both .txt and
-        # the Changes.xlsx, and full PTP tables can repeat a pair across quarters.
-        seen: set[tuple[str, str, str]] = set()
+        # the Changes.xlsx, and the full table's split parts can repeat a pair.
+        # Callers parsing multiple zips (the full table) pass a shared edits/seen
+        # so de-duplication spans every part.
+        if edits is None:
+            edits = []
+        if seen is None:
+            seen = set()
         with zipfile.ZipFile(io.BytesIO(payload)) as zf:
             for name in zf.namelist():
                 low = name.lower()
@@ -134,11 +201,18 @@ class NCCIScraper(BaseScraper):
             if key in seen:
                 continue
             seen.add(key)
+            # The modifier indicator (0/1/9) sits at a different column depending on
+            # layout: index 2 in the delta files, index 5 in the full PTP table
+            # (which also has *, effective/deletion dates and a rationale column).
+            # Scan past the code pair for the cell that is exactly 0/1/9.
             modifier = ""
-            if len(row) > 2 and row[2] is not None:
-                # xlsx modifier-indicator headers carry embedded newlines; keep
-                # just the leading token (the actual 0/1/9 value on data rows).
-                modifier = str(row[2]).strip().split("\n")[0].strip()
+            for cell in row[2:]:
+                if cell is None:
+                    continue
+                token = str(cell).strip().split("\n")[0].strip()
+                if token in ("0", "1", "9"):
+                    modifier = token
+                    break
             edits.append(
                 {
                     "column1": c1,
@@ -169,6 +243,53 @@ class NCCIScraper(BaseScraper):
                 )
         finally:
             wb.close()
+
+
+def _resolve_cms_href(href: str, base_url: str) -> str:
+    """Turn an AMA-license-wrapped href into the direct file URL.
+
+    `/license/ama?file=/files/zip//medicare-...zip` -> the `file=` target, with
+    the occasional doubled slash normalized, joined onto the CMS origin.
+    """
+    parsed = urlparse(href)
+    if parsed.path.endswith("/license/ama"):
+        target = parse_qs(parsed.query).get("file", [""])[0]
+        if target:
+            href = re.sub(r"/{2,}", "/", target)
+    return urljoin(base_url, href)
+
+
+def _select_full_table_parts(hrefs: list[str], base_url: str) -> list[str]:
+    """Pick all parts of the most recent full practitioner PTP table.
+
+    Returns resolved (license-unwrapped) URLs ordered by part number, or [] when
+    no full-table links are present (caller then falls back to the delta zip).
+    """
+    matches = []
+    for h in hrefs:
+        m = RE_FULL_PRACTITIONER.search(h)
+        if m:
+            matches.append((m, h))
+    if not matches:
+        return []
+    # Newest quarter, then newest version. The parts of one release share these.
+    def release_key(item):
+        m = item[0]
+        return (int(m["year"]), int(m["qtr"]), int(m["vmaj"]), int(m["vmin"]))
+
+    best = max(release_key(item) for item in matches)
+    chosen = [item for item in matches if release_key(item) == best]
+    chosen.sort(key=lambda item: int(item[0]["part"]))
+    # De-dupe parts (a page can list the same href twice) while preserving order.
+    seen_parts: set[int] = set()
+    urls: list[str] = []
+    for m, h in chosen:
+        part = int(m["part"])
+        if part in seen_parts:
+            continue
+        seen_parts.add(part)
+        urls.append(_resolve_cms_href(h, base_url))
+    return urls
 
 
 _HCPCS_RE = re.compile(r"^[A-Z0-9]{5}$")
