@@ -84,6 +84,37 @@ class RuleOrdering(unittest.TestCase):
         self.assertIn("R-FL-02", ids[1:])
 
 
+class FederalPointOfCareGates(unittest.TestCase):
+    """42 CFR 8.12 / DEA gates the training masterclass assigns to Engine 1."""
+
+    def test_ecfr_emits_admission_takehome_and_vault_rules(self):
+        matrix = build_rule_matrix([
+            _result("ecfr_42_part_8", {"doc": "42 CFR Part 8"}),
+        ])
+        ids = [r["rule_id"] for r in matrix["rules"]]
+        for expected in ("R-FED-03", "R-FED-04", "R-FED-05", "R-FED-06"):
+            self.assertIn(expected, ids)
+
+    def test_federal_gates_carry_regulatory_basis_and_maturity(self):
+        matrix = build_rule_matrix([
+            _result("ecfr_42_part_8", {"doc": "42 CFR Part 8"}),
+        ])
+        fed = [r for r in matrix["rules"] if r["rule_id"].startswith("R-FED-0")
+               and r["rule_id"] not in ("R-FED-01", "R-FED-02")]
+        for rule in fed:
+            with self.subTest(rule_id=rule["rule_id"]):
+                self.assertIn("regulatory_basis", rule["params"])
+                self.assertIn(rule["params"]["maturity"], {"established", "evolving"})
+
+    def test_ecfr_gates_emit_before_florida(self):
+        matrix = build_rule_matrix([
+            _result("fl_ahca_cbh_handbook", {"doc": "AHCA"}),
+            _result("ecfr_42_part_8", {"doc": "42 CFR Part 8"}),
+        ])
+        ids = [r["rule_id"] for r in matrix["rules"]]
+        self.assertLess(ids.index("R-FED-03"), ids.index("R-FL-02"))
+
+
 class ScrapeFailureGuard(unittest.TestCase):
     def test_failed_scrape_does_not_fabricate_rules(self):
         failed = _result("cms_pub_100_04_ch39", {})

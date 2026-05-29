@@ -138,8 +138,24 @@ Engine1Scraper/
 | `R-FL-04` | AHCA Medicaid | H0020 | HD→HG | ModifierSequencer | FL AHCA |
 | `R-FLMAC-01` | Medicare | G2067 | — | PayerBlocker | FCSO |
 | `R-SIMPLY-01` | Simply MCO | COUNSELING | — | CounselingTimeMinimum | Simply Provider Manual |
+| `R-FL-05` | AHCA Medicaid | H0020 | — | DosingCounselingRatio | FL AHCA |
+| `R-FED-03` | Federal SAMHSA | ADMISSION | — | AdmissionEligibilityGuard | 42 CFR 8.12(e)(1) |
+| `R-FED-04` | Federal SAMHSA | TAKEHOME | — | TakeHomeStabilityGuard | 42 CFR 8.12(i)(2) |
+| `R-FED-05` | Federal SAMHSA | TAKEHOME | — | InitialTakeHomeWindow | 42 CFR 8.12(i) |
+| `R-FED-06` | Federal DEA | VAULT | — | ControlledSubstanceReconciliation | 21 CFR 1304.21–.22 |
 
 Federal rules execute **before** Florida-specific overrides, per the addendum.
+
+The `R-FED-03..06` and `R-FL-05` gates implement the **point-of-care compliance
+blocks** the training masterclass assigns to Engine 1 (1-year addiction-history
+admission mandate, take-home stability/housing block, Day-1 take-home warning,
+zero-variance methadone vault reconciliation, dosing-to-counseling ratio). They
+are deterministic — no AI consent, all 50 states. Each carries a
+`params.regulatory_basis` cite and a `params.maturity` flag: `established` for
+stable statute, `evolving` for rules mid-rulemaking (e.g. the 2024 SAMHSA
+take-home discretion change, and the FL ratio not yet enumerated in the scraped
+PDF) — `evolving` gates should be treated as warnings, not hard blocks, until
+confirmed, consistent with the Rule 32 caution.
 
 ## Source matrix
 
@@ -152,7 +168,7 @@ Federal rules execute **before** Florida-specific overrides, per the addendum.
 | `cms_ncci_medicaid` | ZIP | quarterly | 1 | 🛠 configured, scraper TBD (H0020 edits) |
 | `fl_ahca_cbh_handbook` | HTML | quarterly | 1 | ✅ live |
 | `fl_mac_fcso_otp` | HTML | bi-annually | 1 | ✅ live |
-| `ecfr_42_part_8` | JSON/XML API | ad-hoc | 2 | ✅ live |
+| `ecfr_42_part_8` | JSON/XML API | ad-hoc | 1 + 2 | ✅ live (now also emits Engine-1 gates R-FED-03..06) |
 | `samhsa_tip_63` | PDF | bi-annually | 2 | ✅ live |
 | `sunshine_provider_manual` | PDF | monthly | 1 | ✅ live |
 | `simply_provider_resources` | PDF | quarterly | 1 | ✅ live |
