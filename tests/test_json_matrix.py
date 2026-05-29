@@ -115,6 +115,34 @@ class FederalPointOfCareGates(unittest.TestCase):
         self.assertLess(ids.index("R-FED-03"), ids.index("R-FL-02"))
 
 
+class MedicaidNCCIEdits(unittest.TestCase):
+    """H0020 unbundling edits come from the Medicaid NCCI file, not Medicare."""
+
+    def test_medicaid_edits_get_namespaced_rule_ids(self):
+        matrix = build_rule_matrix([
+            _result("cms_ncci_medicaid", {"edits": [
+                {"column1": "H0020", "column2": "80305", "modifier_indicator": "0"},
+            ]}),
+        ])
+        ids = [r["rule_id"] for r in matrix["rules"]]
+        self.assertIn("R-NCCIMCD-0000", ids)
+        self.assertNotIn("R-NCCI-0000", ids)  # must not collide with Medicare set
+
+    def test_medicare_and_medicaid_edits_do_not_collide(self):
+        matrix = build_rule_matrix([
+            _result("cms_ncci_edits", {"edits": [
+                {"column1": "G2067", "column2": "99213", "modifier_indicator": "1"},
+            ]}),
+            _result("cms_ncci_medicaid", {"edits": [
+                {"column1": "H0020", "column2": "80305", "modifier_indicator": "0"},
+            ]}),
+        ])
+        ids = [r["rule_id"] for r in matrix["rules"]]
+        self.assertIn("R-NCCI-0000", ids)
+        self.assertIn("R-NCCIMCD-0000", ids)
+        self.assertEqual(len(ids), len(set(ids)))  # all rule IDs unique
+
+
 class ScrapeFailureGuard(unittest.TestCase):
     def test_failed_scrape_does_not_fabricate_rules(self):
         failed = _result("cms_pub_100_04_ch39", {})

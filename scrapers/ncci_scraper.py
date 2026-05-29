@@ -245,6 +245,88 @@ class NCCIScraper(BaseScraper):
             wb.close()
 
 
+# Medicaid NCCI PTP zips. CMS posts the Medicaid edit files on a separate page
+# with a different naming convention from the Medicare practitioner table — the
+# H0020 + 80305 (and other H-code) unbundling edits live here, not in the
+# Medicare file. We match practitioner PTP zips and prefer them over the
+# outpatient-hospital set (which Engine 1 doesn't evaluate). Naming has drifted
+# across quarters, so the match is deliberately loose: any .zip whose link text
+# mentions Medicaid + PTP. MUE (medically-unlikely-edit) files are excluded.
+RE_MEDICAID_PTP = re.compile(
+    r"(?=.*medicaid)(?=.*ptp)(?!.*\bmue\b)(?!.*outpatient).*\.zip", re.I
+)
+
+
+class MedicaidNCCIScraper(NCCIScraper):
+    """Medicaid NCCI PTP edits — the H-code (H0020) unbundling source.
+
+    Reuses NCCIScraper's zip/xlsx extraction and OTP-code filtering wholesale;
+    only the link discovery differs (Medicaid edit-files page vs. the Medicare
+    practitioner table). Degrades gracefully — if no Medicaid PTP zip link is
+    found on the page, it returns an empty edit set with a warning rather than
+    raising, so a layout change on the CMS side never takes down the run.
+    """
+
+    def parse(self) -> ScrapeResult:
+        html = self.fetch_text(self.source.url)
+        soup = BeautifulSoup(html, "lxml")
+        hrefs = [a["href"] for a in soup.find_all("a", href=True)]
+
+        # Collect every Medicaid PTP zip, resolve any AMA-license wrapper, dedupe.
+        zip_urls: list[str] = []
+        seen_urls: set[str] = set()
+        for h in hrefs:
+            if not RE_MEDICAID_PTP.search(h):
+                continue
+            url = _resolve_cms_href(h, self.source.url)
+            if url not in seen_urls:
+                seen_urls.add(url)
+                zip_urls.append(url)
+
+        if not zip_urls:
+            return ScrapeResult(
+                source_key=self.source.key,
+                source_name=self.source.name,
+                fetched_at="",
+                content_sha256="",
+                raw_path="",
+                parsed={"doc": "Medicaid NCCI PTP Edits", "edits": []},
+                warnings=["No Medicaid PTP zip link found on the edit-files page"],
+            )
+
+        edits: list[dict] = []
+        seen: set[tuple[str, str, str]] = set()
+        part_digests: list[str] = []
+        first_raw_path = ""
+        warnings: list[str] = []
+        for url in zip_urls:
+            payload = self.fetch_bytes(url)
+            raw_path, digest = self._persist_raw(payload, suffix=".zip")
+            part_digests.append(digest)
+            first_raw_path = first_raw_path or str(raw_path)
+            if not zipfile.is_zipfile(io.BytesIO(payload)):
+                warnings.append(f"Not a zip (license redirect?): {url}")
+                continue
+            self._extract_relevant_edits(payload, edits=edits, seen=seen)
+
+        combined = hashlib.sha256("".join(part_digests).encode()).hexdigest()
+        return ScrapeResult(
+            source_key=self.source.key,
+            source_name=self.source.name,
+            fetched_at="",
+            content_sha256=combined,
+            raw_path=first_raw_path,
+            parsed={
+                "doc": "Medicaid NCCI PTP Edits (practitioner)",
+                "table_scope": "medicaid_ptp",
+                "source_zips": zip_urls,
+                "edit_count_relevant": len(edits),
+                "edits": edits,
+            },
+            warnings=warnings,
+        )
+
+
 def _resolve_cms_href(href: str, base_url: str) -> str:
     """Turn an AMA-license-wrapped href into the direct file URL.
 

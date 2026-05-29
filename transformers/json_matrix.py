@@ -280,12 +280,18 @@ def _from_ecfr_42_part_8(r: ScrapeResult) -> list[dict]:
 
 def _from_ncci(r: ScrapeResult) -> list[dict]:
     edits = r.parsed.get("edits", [])
+    # Namespace the rule IDs by source so the Medicare practitioner table
+    # (cms_ncci_edits) and the Medicaid H-code table (cms_ncci_medicaid) can both
+    # emit edits without colliding on R-NCCI-0000.
+    is_medicaid = r.source_key == "cms_ncci_medicaid"
+    prefix = "R-NCCIMCD" if is_medicaid else "R-NCCI"
+    payer = "Medicaid Clearinghouse" if is_medicaid else "Standard Clearinghouse"
     rules: list[dict] = []
     for i, edit in enumerate(edits):
         rules.append(
             _rule(
-                f"R-NCCI-{i:04d}",
-                "Standard Clearinghouse",
+                f"{prefix}-{i:04d}",
+                payer,
                 edit["column1"],
                 None,
                 "BundleGuard",
@@ -375,6 +381,7 @@ _DISPATCH = {
     "cms_pub_100_02_ch17": _from_pub_100_02,
     "fl_ahca_cbh_handbook": _from_ahca,
     "cms_ncci_edits": _from_ncci,
+    "cms_ncci_medicaid": _from_ncci,
     "fl_mac_fcso_otp": _from_fcso,
     "sunshine_provider_manual": _from_sunshine,
     "simply_provider_resources": _from_simply,

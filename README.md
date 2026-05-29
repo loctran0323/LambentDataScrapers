@@ -165,7 +165,7 @@ confirmed, consistent with the Rule 32 caution.
 | `cms_pub_100_02_ch17` | PDF | monthly | 1 | ✅ live |
 | `cms_mln_otp_booklet` | PDF | bi-annually | 1 | ✅ live |
 | `cms_ncci_edits` | ZIP (full table) | quarterly | 1 | ✅ live (full PTP table; 0 OTP-code edits — see limitations) |
-| `cms_ncci_medicaid` | ZIP | quarterly | 1 | 🛠 configured, scraper TBD (H0020 edits) |
+| `cms_ncci_medicaid` | ZIP | quarterly | 1 | ✅ live (H0020 edits; `MedicaidNCCIScraper`) |
 | `fl_ahca_cbh_handbook` | HTML | quarterly | 1 | ✅ live |
 | `fl_mac_fcso_otp` | HTML | bi-annually | 1 | ✅ live |
 | `ecfr_42_part_8` | JSON/XML API | ad-hoc | 1 + 2 | ✅ live (now also emits Engine-1 gates R-FED-03..06) |
