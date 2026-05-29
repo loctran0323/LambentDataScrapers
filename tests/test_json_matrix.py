@@ -143,6 +143,43 @@ class MedicaidNCCIEdits(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))  # all rule IDs unique
 
 
+class RuleMatrix37Coverage(unittest.TestCase):
+    """The 6 implemented Engine-1 gates from the 37-Rule Master Matrix.
+
+    Rules 11 (internal_policy) and 32 (AI consent) are DEFERRED pending sign-off,
+    so their sources are seeded but must NOT emit rules.
+    """
+
+    _SEED = [
+        ("internal_policy", {"doc": "policy"}),
+        ("fl_dcf_fasams", {"doc": "FASAMS"}),
+        ("fl_mso_contracts", {"doc": "MSO"}),
+        ("fl_ahca_carf_ai_consent", {"doc": "AI consent"}),
+        ("fl_eforcse_pdmp", {"doc": "PDMP"}),
+        ("fl_65d30_fac", {"doc": "65D-30"}),
+    ]
+
+    def _matrix(self):
+        return build_rule_matrix([_result(k, p) for k, p in self._SEED])
+
+    def test_six_implemented_rule_ids_present(self):
+        ids = {r["rule_id"] for r in self._matrix()["rules"]}
+        for rid in ("R-FASAMS-01", "R-FASAMS-02", "R-MSO-01",
+                    "R-PDMP-01", "R-CRED-01", "R-TPLAN-01"):
+            self.assertIn(rid, ids)
+
+    def test_deferred_rules_do_not_emit(self):
+        # Rules 11 and 32 are not implemented yet — no rule, even with the source.
+        ids = {r["rule_id"] for r in self._matrix()["rules"]}
+        self.assertNotIn("R-INT-01", ids)
+        self.assertNotIn("R-FLAI-01", ids)
+
+    def test_matrix_rule_numbers_map_to_doc(self):
+        by_id = {r["rule_id"]: r for r in self._matrix()["rules"]}
+        self.assertEqual(by_id["R-PDMP-01"]["params"]["matrix_rule_number"], 35)
+        self.assertEqual(by_id["R-TPLAN-01"]["params"]["matrix_rule_number"], 37)
+
+
 class ScrapeFailureGuard(unittest.TestCase):
     def test_failed_scrape_does_not_fabricate_rules(self):
         failed = _result("cms_pub_100_04_ch39", {})

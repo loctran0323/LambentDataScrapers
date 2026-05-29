@@ -376,6 +376,156 @@ def _from_simply(r: ScrapeResult) -> list[dict]:
     ]
 
 
+# ---- 37-Rule Matrix: additional Engine 1 gates (Phase 1 rules 28,29,30,35-37)
+# These are hardcoded from their governing citations (like the AHCA R-FL-* rules);
+# their config sources are diff-tracked source-of-record. Each stamps
+# params.matrix_rule_number for 1:1 traceability to the Rule Master Matrix doc.
+#
+# DEFERRED (not implemented yet, per team decision): rule 11 ("No-Pay, No
+# Take-Home", internal_policy) and rule 32 (AI-consent gate,
+# fl_ahca_carf_ai_consent). Their config sources stay as source-of-record but no
+# builder emits a rule until legal/policy sign-off.
+def _from_fl_dcf_fasams(r: ScrapeResult) -> list[dict]:
+    # Matrix rules 28 & 29 — FL DCF / Managing Entity (MSO) data + eligibility.
+    return [
+        _rule(
+            "R-FASAMS-01",
+            "FL DCF/MSO",
+            "INTAKE",
+            None,
+            "IntakeFieldValidation",
+            source_key=r.source_key,
+            friendly_message=(
+                "FL Managing Entity (MSO) invoices require the FASAMS mandatory "
+                "demographic and employment fields to be complete at intake. "
+                "Missing fields cause state-funded invoice rejection — block "
+                "intake completion until they are filled."
+            ),
+            extra={
+                "matrix_rule_number": 28,
+                "required_field_groups": ["demographic", "employment"],
+                "regulatory_basis": "FL DCF Pamphlet 155-2 (FASAMS data elements)",
+                "maturity": "evolving",
+            },
+        ),
+        _rule(
+            "R-FASAMS-02",
+            "FL DCF/MSO",
+            "ELIGIBILITY",
+            None,
+            "EligibilityExpiryWarning",
+            source_key=r.source_key,
+            friendly_message=(
+                f"Financial eligibility re-assessment is due within "
+                f"{r.parsed.get('eligibility_warning_days', 30)} days. Bill against "
+                f"an expired determination and the state can claw the funds back — "
+                f"warn staff to re-assess before it lapses."
+            ),
+            extra={
+                "matrix_rule_number": 29,
+                "warning_window_days": r.parsed.get("eligibility_warning_days", 30),
+                "regulatory_basis": "FL DCF financial eligibility / sliding-fee rules",
+                "maturity": "evolving",
+            },
+        ),
+    ]
+
+
+def _from_fl_mso_contracts(r: ScrapeResult) -> list[dict]:
+    # Matrix rule 30 — regional MSO modifier routing. Contract-specific, not a
+    # single public statute, so maturity="contract".
+    return [
+        _rule(
+            "R-MSO-01",
+            "Regional MSO",
+            "ALL_SUD",
+            None,
+            "RegionalModifierRouting",
+            source_key=r.source_key,
+            friendly_message=(
+                "FL is carved into regional Managing Entities (e.g. LSF vs. Central "
+                "Florida Cares) with different billing modifiers. Apply the modifier "
+                "set for the patient's region before submitting, or the MSO will "
+                "reject the claim."
+            ),
+            extra={
+                "matrix_rule_number": 30,
+                "regulatory_basis": "Regional MSO contracts (LSF, Central Florida Cares, etc.)",
+                "maturity": "contract",
+            },
+        )
+    ]
+
+
+def _from_fl_eforcse_pdmp(r: ScrapeResult) -> list[dict]:
+    # Matrix rule 35 — Florida PDMP (E-FORCSE) query mandate before prescribing.
+    return [
+        _rule(
+            "R-PDMP-01",
+            "FL E-FORCSE",
+            "PRESCRIBE",
+            None,
+            "PdmpQueryGate",
+            source_key=r.source_key,
+            friendly_message=(
+                "Florida law requires the prescriber to check the E-FORCSE PDMP "
+                "before prescribing a controlled substance. Confirm a documented "
+                "PDMP query for this patient before the prescription is finalized."
+            ),
+            extra={
+                "matrix_rule_number": 35,
+                "regulatory_basis": "FL Statute 893.055(2)(a)",
+                "maturity": "established",
+            },
+        )
+    ]
+
+
+def _from_fl_65d30_fac(r: ScrapeResult) -> list[dict]:
+    # Matrix rules 36 & 37 — FL Admin Code 65D-30 (personnel + treatment planning).
+    return [
+        _rule(
+            "R-CRED-01",
+            "FL DCF Medicaid",
+            "COUNSELING",
+            None,
+            "CredentialingBillingBlock",
+            source_key=r.source_key,
+            friendly_message=(
+                "Counseling billed under an unlicensed counselor must have a "
+                "qualified supervisor of record (FL 65D-30 personnel standards). "
+                "Block billing for sessions lacking documented supervision — "
+                "unsupervised counselor time is a retroactive Medicaid clawback."
+            ),
+            extra={
+                "matrix_rule_number": 36,
+                "regulatory_basis": "FL Admin Code 65D-30.004 (personnel)",
+                "maturity": "established",
+            },
+        ),
+        _rule(
+            "R-TPLAN-01",
+            "CARF/FL",
+            "TREATMENT_PLAN",
+            None,
+            "TreatmentPlanExpiry",
+            source_key=r.source_key,
+            friendly_message=(
+                f"Treatment plans must be reviewed/updated on the required cadence "
+                f"(CARF + FL 65D-30). Alert staff "
+                f"{r.parsed.get('plan_warning_days', 14)} days before this patient's "
+                f"plan expires so a CARF survey never finds a lapsed plan."
+            ),
+            extra={
+                "matrix_rule_number": 37,
+                "warning_window_days": r.parsed.get("plan_warning_days", 14),
+                "regulatory_basis": "CARF Behavioral Health standards + FL 65D-30.0046",
+                "maturity": "established",
+            },
+        ),
+    ]
+
+
 _DISPATCH = {
     "cms_pub_100_04_ch39": _from_pub_100_04,
     "cms_pub_100_02_ch17": _from_pub_100_02,
@@ -386,6 +536,13 @@ _DISPATCH = {
     "sunshine_provider_manual": _from_sunshine,
     "simply_provider_resources": _from_simply,
     "ecfr_42_part_8": _from_ecfr_42_part_8,
+    # 37-Rule Matrix additions (Phase 1 Engine-1 gates):
+    # rule 11 (internal_policy) and rule 32 (fl_ahca_carf_ai_consent) DEFERRED —
+    # not dispatched until legal/policy sign-off.
+    "fl_dcf_fasams": _from_fl_dcf_fasams,                # rules 28, 29
+    "fl_mso_contracts": _from_fl_mso_contracts,          # rule 30
+    "fl_eforcse_pdmp": _from_fl_eforcse_pdmp,            # rule 35
+    "fl_65d30_fac": _from_fl_65d30_fac,                  # rules 36, 37
 }
 
 

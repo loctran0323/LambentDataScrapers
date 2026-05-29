@@ -143,8 +143,21 @@ Engine1Scraper/
 | `R-FED-04` | Federal SAMHSA | TAKEHOME | — | TakeHomeStabilityGuard | 42 CFR 8.12(i)(2) |
 | `R-FED-05` | Federal SAMHSA | TAKEHOME | — | InitialTakeHomeWindow | 42 CFR 8.12(i) |
 | `R-FED-06` | Federal DEA | VAULT | — | ControlledSubstanceReconciliation | 21 CFR 1304.21–.22 |
+| `R-FASAMS-01` | FL DCF/MSO | INTAKE | — | IntakeFieldValidation | FL DCF Pamphlet 155-2 |
+| `R-FASAMS-02` | FL DCF/MSO | ELIGIBILITY | — | EligibilityExpiryWarning | FL DCF eligibility rules |
+| `R-MSO-01` | Regional MSO | ALL_SUD | — | RegionalModifierRouting | MSO contracts |
+| `R-PDMP-01` | FL E-FORCSE | PRESCRIBE | — | PdmpQueryGate | FL Statute 893.055 |
+| `R-CRED-01` | FL DCF Medicaid | COUNSELING | — | CredentialingBillingBlock | FL 65D-30.004 |
+| `R-TPLAN-01` | CARF/FL | TREATMENT_PLAN | — | TreatmentPlanExpiry | CARF + FL 65D-30.0046 |
 
 Federal rules execute **before** Florida-specific overrides, per the addendum.
+
+These map to the **37-Rule Master Matrix** — see [RULE_MATRIX_COVERAGE.md](RULE_MATRIX_COVERAGE.md)
+for the full rule-by-rule status (16 Engine-1 rules, 21 Engine-2 corpus sources).
+The `R-FASAMS-*`, `R-MSO-01`, `R-PDMP-01`, `R-CRED-01`, `R-TPLAN-01` gates are
+**defined but awaiting scrapers** (their sources are configured, scraper TBD).
+Matrix rules **11 (No-Pay take-home)** and **32 (AI consent)** are **deferred** —
+not enacted law / internal policy — and emit no rule pending legal sign-off.
 
 The `R-FED-03..06` and `R-FL-05` gates implement the **point-of-care compliance
 blocks** the training masterclass assigns to Engine 1 (1-year addiction-history

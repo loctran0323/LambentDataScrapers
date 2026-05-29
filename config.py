@@ -139,6 +139,58 @@ ENGINE1_SOURCES: list[Source] = [
         "statute). No scraper registered yet — config entry is the diff-tracked "
         "source-of-record per the README review.",
     ),
+    # ----- 37-Rule Matrix Phase 1 additions (Engine-1 gates) -----
+    # All are diff-tracked source-of-record only; no scraper registered yet, so
+    # they are skipped gracefully at runtime (like asam_criteria / fl_ahca_carf_*).
+    Source(
+        key="internal_policy",
+        name="VAIntage Internal / Corporate Policy (Rule 11 — No-Pay take-home flag)",
+        url="",  # internal policy, not a scrape target
+        cadence="ad-hoc",
+        engine="engine1",
+        notes="Matrix rule 11. Internal corporate policy, NOT statute. Emitted as "
+        "a billing WARNING only — must never block a clinically indicated dose.",
+    ),
+    Source(
+        key="fl_dcf_fasams",
+        name="FL DCF FASAMS — Pamphlet 155-2 (Rules 28, 29 — intake data + eligibility)",
+        # FL DCF SAMH / FASAMS data system. Monitoring entry point, not a stable
+        # deep link to the data-element dictionary — validate before parsing.
+        url="https://www.myflfamilies.com/services/samh/fasams",
+        cadence="quarterly",
+        engine="engine1",
+        notes="Matrix rules 28 & 29. FASAMS mandatory demographic/employment "
+        "fields + financial-eligibility re-assessment. Scraper TBD.",
+    ),
+    Source(
+        key="fl_mso_contracts",
+        name="FL Regional Managing Entities (MSO) — modifier routing (Rule 30)",
+        url="https://www.myflfamilies.com/services/samh/managing-entities",
+        cadence="quarterly",
+        engine="engine1",
+        notes="Matrix rule 30. Regional MSO (LSF, Central Florida Cares, etc.) "
+        "modifier routing. Contract-specific, not a single public statute. "
+        "Scraper TBD.",
+    ),
+    Source(
+        key="fl_eforcse_pdmp",
+        name="FL E-FORCSE PDMP — mandatory query (Rule 35)",
+        url="https://e-forcse.com/",
+        cadence="annually",
+        engine="engine1",
+        notes="Matrix rule 35. FL Statute 893.055 mandates a PDMP check before "
+        "prescribing controlled substances. Scraper TBD (rule is hardcoded from "
+        "the statute; this entry tracks source changes).",
+    ),
+    Source(
+        key="fl_65d30_fac",
+        name="FL Admin Code 65D-30 — personnel + treatment planning (Rules 36, 37)",
+        url="https://www.flrules.org/gateway/ChapterHome.asp?Chapter=65d-30",
+        cadence="annually",
+        engine="engine1",
+        notes="Matrix rules 36 & 37. 65D-30.004 (clinical supervision/credentialing) "
+        "and 65D-30.0046 (treatment-plan review timelines, with CARF). Scraper TBD.",
+    ),
 ]
 
 # ---------- Engine 2: Clinical / SDOH NLP corpus sources ----------
@@ -192,6 +244,113 @@ ENGINE2_SOURCES: list[Source] = [
         notes="Confidentiality of SUD records. Scrape §2.31 for the 9 required "
         "consent elements. No scraper registered yet — extend ECFRPart8Scraper "
         "to Part 2 as the follow-up.",
+    ),
+    # ----- 37-Rule Matrix: Engine-2 clinical / governance corpus sources -----
+    # These back the Clinical Shield (Engine 2) RAG rules. They are NOT Engine-1
+    # matrix rules — Engine 2 reads note context via the vector corpus, it does
+    # not emit deterministic JSON gates. All are monitoring entry points with no
+    # scraper registered yet; URLs are governing-body roots, not stable deep links.
+    Source(
+        key="corporate_clinical_policy",
+        name="Corporate Clinical Policy — Patient Rights + Code of Ethics (Rules 6, 7)",
+        url="",  # internal corporate policy manual
+        cadence="ad-hoc",
+        engine="engine2",
+        notes="Matrix rules 6 (patient rights/discharge proof) & 7 (objective-tone "
+        "code of ethics). Internal policy corpus. Scraper TBD.",
+    ),
+    Source(
+        key="aatod_guidelines",
+        name="AATOD Guidelines — discharge/retention, SDOH, co-occurring (Rules 8, 9, 19)",
+        url="https://www.aatod.org/",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rules 8 (admin discharge/retention), 9 (Medicare SDOH "
+        "documentation), 19 (co-occurring Hep-C/HIV referral). Scraper TBD.",
+    ),
+    Source(
+        key="nida_principles",
+        name="NIDA Principles of Drug Addiction Treatment (Rules 10, 18, 21)",
+        url="https://nida.nih.gov/publications/principles-drug-addiction-treatment-research-based-guide-third-edition",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rules 10 (90-day efficacy/dropout risk), 18 (polysubstance/"
+        "xylazine alerts), 21 (post-relapse plan modification). Scraper TBD.",
+    ),
+    Source(
+        key="fl_marchman_act",
+        name="FL Marchman Act — Ch. 397 (Rule 15 — impaired/AMA discharge)",
+        url="http://www.leg.state.fl.us/statutes/index.cfm?App_mode=Display_Statute&URL=0300-0399/0397/0397.html",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 15. Involuntary-hold guidance for impaired patients. Scraper TBD.",
+    ),
+    Source(
+        key="fl_baker_act",
+        name="FL Baker Act — Ch. 394 Part I (Rule 16 — psychiatric vs. substance crisis)",
+        url="http://www.leg.state.fl.us/statutes/index.cfm?App_mode=Display_Statute&URL=0300-0399/0394/0394.html",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 16. Suicidal vs. intoxicated triage guidance. Scraper TBD.",
+    ),
+    Source(
+        key="fda_rems_methadone",
+        name="FDA REMS — methadone cardiac toxicity / high-dose EKG (Rule 17)",
+        url="https://www.accessdata.fda.gov/scripts/cder/rems/index.cfm",
+        cadence="bi-annually",
+        engine="engine2",
+        notes="Matrix rule 17. Flag high methadone doses lacking an EKG on file. Scraper TBD.",
+    ),
+    Source(
+        key="hhs_oig_compliance",
+        name="HHS OIG Compliance — note cloning / copy-paste fraud (Rule 20)",
+        url="https://oig.hhs.gov/compliance/compliance-guidance/",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 20. Detect cloned/copy-pasted clinical notes. Scraper TBD.",
+    ),
+    Source(
+        key="carf_standards",
+        name="CARF Behavioral Health Standards — integrated primary care (Rule 22)",
+        url="https://www.carf.org/programs/bh/",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 22. Subscription-gated like asam_criteria — needs "
+        "institutional access. Scraper TBD.",
+    ),
+    Source(
+        key="samhsa_sor_grant",
+        name="SAMHSA SOR Grant — Naloxone/Narcan distribution audit (Rule 23)",
+        url="https://www.samhsa.gov/grants/grant-announcements",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 23 (grant add-on). Audit Narcan distribution logs. Scraper TBD.",
+    ),
+    Source(
+        key="hrsa_rcorp",
+        name="HRSA RCORP — rural SDOH barriers (Rule 24)",
+        url="https://www.hrsa.gov/rural-health/grants/rural-community-opioid",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 24 (grant add-on). Document broadband/transit barriers. Scraper TBD.",
+    ),
+    Source(
+        key="samhsa_sabg",
+        name="SAMHSA SABG Block Grant — 48-hour priority admission (Rule 25)",
+        url="https://www.samhsa.gov/grants/block-grants/sabg",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 25 (grant add-on). Alert on waitlisted pregnant/IV "
+        "patients past the 48-hour priority window. Scraper TBD.",
+    ),
+    Source(
+        key="dea_mobile_otp",
+        name="DEA Mobile OTP — dispensing security / GPS inventory (Rule 27)",
+        url="https://www.deadiversion.usdoj.gov/",
+        cadence="annually",
+        engine="engine2",
+        notes="Matrix rule 27 (expansion add-on). Zero-variance inventory + GPS "
+        "logs for mobile RV clinics (21 CFR 1301 mobile-component rule). Scraper TBD.",
     ),
 ]
 
