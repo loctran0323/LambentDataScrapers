@@ -106,6 +106,19 @@ class FederalPointOfCareGates(unittest.TestCase):
                 self.assertIn("regulatory_basis", rule["params"])
                 self.assertIn(rule["params"]["maturity"], {"established", "evolving"})
 
+    def test_takehome_gate_uses_2024_cap_and_stability_assessment(self):
+        # Kevin's 2026-05 update: not a Day-1 block — a 7-day cap in the first 14
+        # days plus a required Medical Director Stability Assessment.
+        matrix = build_rule_matrix([
+            _result("ecfr_42_part_8", {"doc": "42 CFR Part 8"}),
+        ])
+        r5 = next(r for r in matrix["rules"] if r["rule_id"] == "R-FED-05")
+        self.assertEqual(r5["logic_type"], "TakeHomeStabilityGate")
+        self.assertEqual(r5["params"]["initial_cap_days"], 7)
+        self.assertEqual(r5["params"]["initial_window_days"], 14)
+        self.assertTrue(r5["params"]["requires_stability_assessment"])
+        self.assertEqual(r5["params"]["maturity"], "established")
+
     def test_ecfr_gates_emit_before_florida(self):
         matrix = build_rule_matrix([
             _result("fl_ahca_cbh_handbook", {"doc": "AHCA"}),

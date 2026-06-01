@@ -141,7 +141,7 @@ Engine1Scraper/
 | `R-FL-05` | AHCA Medicaid | H0020 | — | DosingCounselingRatio | FL AHCA |
 | `R-FED-03` | Federal SAMHSA | ADMISSION | — | AdmissionEligibilityGuard | 42 CFR 8.12(e)(1) |
 | `R-FED-04` | Federal SAMHSA | TAKEHOME | — | TakeHomeStabilityGuard | 42 CFR 8.12(i)(2) |
-| `R-FED-05` | Federal SAMHSA | TAKEHOME | — | InitialTakeHomeWindow | 42 CFR 8.12(i) |
+| `R-FED-05` | Federal SAMHSA | TAKEHOME | — | TakeHomeStabilityGate | 42 CFR 8.12(i)(2),(i)(3)(i) (2024) |
 | `R-FED-06` | Federal DEA | VAULT | — | ControlledSubstanceReconciliation | 21 CFR 1304.21–.22 |
 | `R-FASAMS-01` | FL DCF/MSO | INTAKE | — | IntakeFieldValidation | FL DCF Pamphlet 155-2 |
 | `R-FASAMS-02` | FL DCF/MSO | ELIGIBILITY | — | EligibilityExpiryWarning | FL DCF eligibility rules |

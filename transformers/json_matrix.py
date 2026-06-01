@@ -170,6 +170,9 @@ def _from_ahca(r: ScrapeResult) -> list[dict]:
                 "window_days": r.parsed.get("dosing_ratio_window_days", 30),
                 "regulatory_basis": "FL AHCA Community Behavioral Health Services Handbook",
                 "maturity": "evolving",  # ratio not enumerated in scraped PDF; diff-tracked
+                # Kevin's revised matrix: rule 4, "FL DCF Mandatory Counseling
+                # Minutes & Phase Ratios" — to be hardcoded (no scraping needed).
+                "matrix_rule_number": 4,
             },
         ),
     ]
@@ -211,6 +214,12 @@ def _from_ecfr_42_part_8(r: ScrapeResult) -> list[dict]:
                 ],
                 "regulatory_basis": "42 CFR 8.12(e)(1)",
                 "maturity": "established",
+                # Kevin's 2026-05 overhaul renumbers this to rule 38 AND proposes
+                # reclassifying it as Engine 2 NLP (narrative-completeness check on
+                # the admission note). Pending the full revised matrix — flagged for
+                # Monday; the deterministic Engine-1 gate stays live until then.
+                "matrix_rule_number": 38,
+                "pending_reclassification": "engine2_nlp",
             },
         ),
         _rule(
@@ -232,6 +241,9 @@ def _from_ecfr_42_part_8(r: ScrapeResult) -> list[dict]:
                 "all_factors": "42 CFR 8.12(i)(2)(i)-(viii)",
                 "regulatory_basis": "42 CFR 8.12(i)(2)",
                 "maturity": "established",
+                # Kevin's 2026-05 overhaul: rule 33, Engine 1 & 2 dual-threat
+                # (CMS Z59.0 housing-instability + SAMHSA safe-storage guardrail).
+                "matrix_rule_number": 33,
             },
         ),
         _rule(
@@ -239,21 +251,36 @@ def _from_ecfr_42_part_8(r: ScrapeResult) -> list[dict]:
             "Federal SAMHSA",
             "TAKEHOME",
             None,
-            "InitialTakeHomeWindow",
+            "TakeHomeStabilityGate",
             source_key=r.source_key,
             friendly_message=(
-                f"Take-home doses in the first {p.get('initial_takehome_min_days', 1)} "
-                f"day(s) of treatment require an explicit documented clinical "
-                f"justification under the 42 CFR 8.12(i) take-home framework. "
-                f"On day 1 the patient has the least supporting history — warn the "
-                f"prescriber before the dose is dispensed."
+                f"2024 SAMHSA take-home gate. Day-1 take-homes are now permitted for "
+                f"stable patients, but (1) during the first "
+                f"{p.get('initial_window_days', 14)} days the supply is capped at "
+                f"{p.get('initial_cap_days', 7)} days (42 CFR 8.12(i)(3)(i)), and "
+                f"(2) the Medical Director's risk/benefit Stability Assessment must "
+                f"be signed in the chart first (42 CFR 8.12(i)(2)). Block the "
+                f"dispense if days_in_treatment < {p.get('initial_window_days', 14)} "
+                f"AND requested take-home days > {p.get('initial_cap_days', 7)}, OR "
+                f"if the Stability Assessment is not documented."
             ),
             extra={
-                "initial_takehome_min_days": p.get("initial_takehome_min_days", 1),
-                "regulatory_basis": "42 CFR 8.12(i)",
-                # The 2024 SAMHSA final rule widened clinical discretion on early
-                # take-homes, so this is a warning gate, not an absolute block.
-                "maturity": "evolving",
+                # Two-part gate, per Kevin's 2026-05 update of the day-in-the-life:
+                #   block if (days_in_treatment < initial_window_days AND
+                #             takehome_days > initial_cap_days)
+                #        OR (takehome_requested AND not stability_assessment_complete)
+                "initial_window_days": p.get("initial_window_days", 14),
+                "initial_cap_days": p.get("initial_cap_days", 7),
+                # Tiered caps after the initial window (8.12(i)(3)).
+                "cap_schedule_days": p.get(
+                    "cap_schedule",
+                    {"0-14": 7, "15-31": 14, "32+": 28},
+                ),
+                "requires_stability_assessment": True,
+                "stability_flag_field": "Stability_Assessment_Complete",
+                "regulatory_basis": "42 CFR 8.12(i)(2), 8.12(i)(3)(i) (2024 final rule)",
+                "maturity": "established",  # confirmed 2024 final rule, not speculative
+                "matrix_rule_number": 8,    # Kevin's revised matrix alignment
             },
         ),
         _rule(
@@ -273,6 +300,7 @@ def _from_ecfr_42_part_8(r: ScrapeResult) -> list[dict]:
                 "allowed_variance_mg": p.get("allowed_variance_mg", 0),
                 "regulatory_basis": "21 CFR 1304.21, 1304.22(c)",
                 "maturity": "established",
+                "matrix_rule_number": 2,  # Kevin's revised matrix: DEA Zero-Variance Dispensing Log
             },
         ),
     ]
